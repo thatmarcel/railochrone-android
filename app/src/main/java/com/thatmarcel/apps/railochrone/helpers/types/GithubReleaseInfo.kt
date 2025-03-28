@@ -1,4 +1,4 @@
-package com.thatmarcel.apps.railochrone
+package com.thatmarcel.apps.railochrone.helpers.types
 
 import com.google.gson.annotations.SerializedName
 

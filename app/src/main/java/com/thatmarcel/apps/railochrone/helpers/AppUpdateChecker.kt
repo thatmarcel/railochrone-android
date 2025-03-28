@@ -1,7 +1,8 @@
-package com.thatmarcel.apps.railochrone
+package com.thatmarcel.apps.railochrone.helpers
 
 import android.content.Context
 import com.google.gson.Gson
+import com.thatmarcel.apps.railochrone.helpers.types.GithubReleaseInfo
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient

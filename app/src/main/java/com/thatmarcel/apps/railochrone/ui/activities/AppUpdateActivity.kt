@@ -1,5 +1,6 @@
-package com.thatmarcel.apps.railochrone
+package com.thatmarcel.apps.railochrone.ui.activities
 
+import android.R
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -16,6 +17,8 @@ import androidx.core.content.FileProvider
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.android.core.permissions.PermissionsManager
+import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
+import com.thatmarcel.apps.railochrone.helpers.ProgressResponseBody
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -44,35 +47,35 @@ class AppUpdateActivity: AppCompatActivity() {
 
         enableEdgeToEdge()
 
-        if (AppUpdateChecker.apkDownloadUrl == null) {
+        if (AppUpdateChecker.Companion.apkDownloadUrl == null) {
             finishAndOverrideTransitionIfNeeded()
             return
         }
 
-        apkDownloadUrl = AppUpdateChecker.apkDownloadUrl!!
+        apkDownloadUrl = AppUpdateChecker.Companion.apkDownloadUrl!!
 
         setupView()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, android.R.anim.fade_in, android.R.anim.fade_out)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.fade_in, R.anim.fade_out)
         }
     }
 
     private fun setupView() {
-        setContentView(R.layout.activity_app_update)
+        setContentView(com.thatmarcel.apps.railochrone.R.layout.activity_app_update)
 
-        downloadAndInstallButton = findViewById(R.id.content_app_update_download_and_install_button)
-        dismissButton = findViewById(R.id.content_app_update_dismiss_button)
+        downloadAndInstallButton = findViewById(com.thatmarcel.apps.railochrone.R.id.content_app_update_download_and_install_button)
+        dismissButton = findViewById(com.thatmarcel.apps.railochrone.R.id.content_app_update_dismiss_button)
 
-        progressIndicator = findViewById(R.id.content_app_update_progress_indicator)
+        progressIndicator = findViewById(com.thatmarcel.apps.railochrone.R.id.content_app_update_progress_indicator)
 
         dismissButton.setOnClickListener {
             val permissionsManager = PermissionsManager(object : PermissionsListener {
-                override fun onExplanationNeeded(permissionsToExplain: List<String>) { }
-                override fun onPermissionResult(granted: Boolean) { }
+                override fun onExplanationNeeded(permissionsToExplain: List<String>) {}
+                override fun onPermissionResult(granted: Boolean) {}
             })
 
-            if (PermissionsManager.areLocationPermissionsGranted(this)) {
+            if (PermissionsManager.Companion.areLocationPermissionsGranted(this)) {
                 finishAndOverrideTransitionIfNeeded()
             } else {
                 permissionsManager.requestLocationPermissions(this)
@@ -180,7 +183,7 @@ class AppUpdateActivity: AppCompatActivity() {
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             @Suppress("DEPRECATION")
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
     }
 

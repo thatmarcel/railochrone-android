@@ -1,4 +1,4 @@
-package com.thatmarcel.apps.railochrone
+package com.thatmarcel.apps.railochrone.helpers
 
 import okhttp3.MediaType
 import okhttp3.ResponseBody

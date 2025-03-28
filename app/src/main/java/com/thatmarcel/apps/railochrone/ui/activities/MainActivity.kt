@@ -1,4 +1,4 @@
-package com.thatmarcel.apps.railochrone
+package com.thatmarcel.apps.railochrone.ui.activities
 
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
@@ -31,7 +31,6 @@ import com.mapbox.maps.ViewAnnotationOptions
 import com.mapbox.maps.extension.style.expressions.dsl.generated.get
 import com.mapbox.maps.extension.style.expressions.dsl.generated.literal
 import com.mapbox.maps.extension.style.expressions.generated.Expression
-import com.mapbox.maps.extension.style.expressions.generated.Expression.Companion.eq
 import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.generated.lineLayer
 import com.mapbox.maps.extension.style.layers.properties.generated.LineCap
@@ -49,6 +48,9 @@ import com.mapbox.maps.plugin.logo.logo
 import com.mapbox.maps.plugin.scalebar.scalebar
 import com.mapbox.maps.plugin.viewport.viewport
 import com.mapbox.maps.viewannotation.geometry
+import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
+import com.thatmarcel.apps.railochrone.helpers.types.LivePositionInfo
+import com.thatmarcel.apps.railochrone.R
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -57,7 +59,6 @@ import okhttp3.Response
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.min
-
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
@@ -160,67 +161,67 @@ class MainActivity : AppCompatActivity() {
             })
 
             it.addLayer(lineLayer("bus", "lines") {
-                lineCap(LineCap.ROUND)
-                lineJoin(LineJoin.ROUND)
+                lineCap(LineCap.Companion.ROUND)
+                lineJoin(LineJoin.Companion.ROUND)
                 lineOpacity(0.8)
                 lineWidth(4.5)
                 lineColor("#b32e2d")
                 filter(
-                    Expression.any(
-                        eq(get("branch"), literal(30)),
-                        eq(get("branch"), literal(31)),
-                        eq(get("branch"), literal(32)),
-                        eq(get("branch"), literal(33)),
-                        eq(get("branch"), literal(34)),
-                        eq(get("branch"), literal(35)),
-                        eq(get("branch"), literal(36)),
-                        eq(get("branch"), literal(37)),
-                        eq(get("branch"), literal(38)),
-                        eq(get("branch"), literal(39))
+                    Expression.Companion.any(
+                        Expression.Companion.eq(get("branch"), literal(30)),
+                        Expression.Companion.eq(get("branch"), literal(31)),
+                        Expression.Companion.eq(get("branch"), literal(32)),
+                        Expression.Companion.eq(get("branch"), literal(33)),
+                        Expression.Companion.eq(get("branch"), literal(34)),
+                        Expression.Companion.eq(get("branch"), literal(35)),
+                        Expression.Companion.eq(get("branch"), literal(36)),
+                        Expression.Companion.eq(get("branch"), literal(37)),
+                        Expression.Companion.eq(get("branch"), literal(38)),
+                        Expression.Companion.eq(get("branch"), literal(39))
                     )
                 )
             })
 
             it.addLayer(lineLayer("u-train", "lines") {
-                lineCap(LineCap.ROUND)
-                lineJoin(LineJoin.ROUND)
+                lineCap(LineCap.Companion.ROUND)
+                lineJoin(LineJoin.Companion.ROUND)
                 lineOpacity(0.8)
                 lineWidth(4.5)
                 lineColor("#418cc3")
                 filter(
-                    Expression.any(
-                        eq(get("branch"), literal(20)),
-                        eq(get("branch"), literal(21)),
-                        eq(get("branch"), literal(22)),
-                        eq(get("branch"), literal(23)),
-                        eq(get("branch"), literal(24)),
-                        eq(get("branch"), literal(25)),
-                        eq(get("branch"), literal(26)),
-                        eq(get("branch"), literal(27)),
-                        eq(get("branch"), literal(28)),
-                        eq(get("branch"), literal(29))
+                    Expression.Companion.any(
+                        Expression.Companion.eq(get("branch"), literal(20)),
+                        Expression.Companion.eq(get("branch"), literal(21)),
+                        Expression.Companion.eq(get("branch"), literal(22)),
+                        Expression.Companion.eq(get("branch"), literal(23)),
+                        Expression.Companion.eq(get("branch"), literal(24)),
+                        Expression.Companion.eq(get("branch"), literal(25)),
+                        Expression.Companion.eq(get("branch"), literal(26)),
+                        Expression.Companion.eq(get("branch"), literal(27)),
+                        Expression.Companion.eq(get("branch"), literal(28)),
+                        Expression.Companion.eq(get("branch"), literal(29))
                     )
                 )
             })
 
             it.addLayer(lineLayer("s-train", "lines") {
-                lineCap(LineCap.ROUND)
-                lineJoin(LineJoin.ROUND)
+                lineCap(LineCap.Companion.ROUND)
+                lineJoin(LineJoin.Companion.ROUND)
                 lineOpacity(0.8)
                 lineWidth(4.5)
                 lineColor("#6cb146")
                 filter(
-                    Expression.any(
-                        eq(get("branch"), literal(10)),
-                        eq(get("branch"), literal(11)),
-                        eq(get("branch"), literal(12)),
-                        eq(get("branch"), literal(13)),
-                        eq(get("branch"), literal(14)),
-                        eq(get("branch"), literal(15)),
-                        eq(get("branch"), literal(16)),
-                        eq(get("branch"), literal(17)),
-                        eq(get("branch"), literal(18)),
-                        eq(get("branch"), literal(19))
+                    Expression.Companion.any(
+                        Expression.Companion.eq(get("branch"), literal(10)),
+                        Expression.Companion.eq(get("branch"), literal(11)),
+                        Expression.Companion.eq(get("branch"), literal(12)),
+                        Expression.Companion.eq(get("branch"), literal(13)),
+                        Expression.Companion.eq(get("branch"), literal(14)),
+                        Expression.Companion.eq(get("branch"), literal(15)),
+                        Expression.Companion.eq(get("branch"), literal(16)),
+                        Expression.Companion.eq(get("branch"), literal(17)),
+                        Expression.Companion.eq(get("branch"), literal(18)),
+                        Expression.Companion.eq(get("branch"), literal(19))
                     )
                 )
             })
@@ -250,10 +251,22 @@ class MainActivity : AppCompatActivity() {
                 .build()
         )
 
-        val latMin = min(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude()) - viewportCoordinatePadding
-        val lonMin = min(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude()) - viewportCoordinatePadding
-        val latMax = max(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude()) + viewportCoordinatePadding
-        val lonMax = max(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude()) + viewportCoordinatePadding
+        val latMin = min(
+            coordinateBounds.northeast.latitude(),
+            coordinateBounds.southwest.latitude()
+        ) - viewportCoordinatePadding
+        val lonMin = min(
+            coordinateBounds.northeast.longitude(),
+            coordinateBounds.southwest.longitude()
+        ) - viewportCoordinatePadding
+        val latMax = max(
+            coordinateBounds.northeast.latitude(),
+            coordinateBounds.southwest.latitude()
+        ) + viewportCoordinatePadding
+        val lonMax = max(
+            coordinateBounds.northeast.longitude(),
+            coordinateBounds.southwest.longitude()
+        ) + viewportCoordinatePadding
 
         val url = "https://livekarte.vvs.de/proxy/livepositions?latMin=${latMin}&lonMin=${lonMin}&latMax=${latMax}&lonMax=${lonMax}"
 
@@ -293,7 +306,8 @@ class MainActivity : AppCompatActivity() {
                             annotationView = mapView.viewAnnotationManager.addViewAnnotation(
                                 R.layout.live_position_marker,
                                 ViewAnnotationOptions.Builder()
-                                    .geometry(Point.fromLngLat(
+                                    .geometry(
+                                        Point.fromLngLat(
                                         newLivePositionInfo.longitude,
                                         newLivePositionInfo.latitude
                                     ))
@@ -316,7 +330,8 @@ class MainActivity : AppCompatActivity() {
                                 mapView.viewAnnotationManager.updateViewAnnotation(
                                     annotationView,
                                     ViewAnnotationOptions.Builder()
-                                        .geometry(Point.fromLngLat(
+                                        .geometry(
+                                            Point.fromLngLat(
                                             newLivePositionInfo.longitude,
                                             newLivePositionInfo.latitude)
                                         )
@@ -380,8 +395,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLocationPuck() {
         mapView.location.locationPuck = LocationPuck2D(
-            topImage = ImageHolder.from(com.mapbox.maps.plugin.locationcomponent.R.drawable.mapbox_user_icon),
-            bearingImage = ImageHolder.from(com.mapbox.maps.plugin.locationcomponent.R.drawable.mapbox_user_bearing_icon),
+            topImage = ImageHolder.Companion.from(com.mapbox.maps.plugin.locationcomponent.R.drawable.mapbox_user_icon),
+            bearingImage = ImageHolder.Companion.from(com.mapbox.maps.plugin.locationcomponent.R.drawable.mapbox_user_bearing_icon),
             shadowImage = null
         )
         mapView.location.enabled = true
@@ -394,7 +409,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestLocationPermission() {
         val permissionsManager = PermissionsManager(object : PermissionsListener {
-            override fun onExplanationNeeded(permissionsToExplain: List<String>) { }
+            override fun onExplanationNeeded(permissionsToExplain: List<String>) {}
             override fun onPermissionResult(granted: Boolean) {
                 if (granted) {
                     restartApp()
@@ -404,7 +419,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        if (PermissionsManager.areLocationPermissionsGranted(this)) {
+        if (PermissionsManager.Companion.areLocationPermissionsGranted(this)) {
             checkForUpdate()
         } else {
             permissionsManager.requestLocationPermissions(this)
@@ -412,7 +427,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdate() {
-        AppUpdateChecker.checkForUpdate(this) { isUpdateAvailable ->
+        AppUpdateChecker.Companion.checkForUpdate(this) { isUpdateAvailable ->
             if (isUpdateAvailable) {
                 startActivity(
                     Intent(this, AppUpdateActivity::class.java),
