@@ -1,6 +1,7 @@
 package com.thatmarcel.apps.railochrone
 
 import android.annotation.SuppressLint
+import android.app.ActivityOptions
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
@@ -397,12 +398,31 @@ class MainActivity : AppCompatActivity() {
             override fun onPermissionResult(granted: Boolean) {
                 if (granted) {
                     restartApp()
+                } else {
+                    checkForUpdate()
                 }
             }
         })
 
-        if (!PermissionsManager.areLocationPermissionsGranted(this)) {
+        if (PermissionsManager.areLocationPermissionsGranted(this)) {
+            checkForUpdate()
+        } else {
             permissionsManager.requestLocationPermissions(this)
+        }
+    }
+
+    private fun checkForUpdate() {
+        AppUpdateChecker.checkForUpdate(this) { isUpdateAvailable ->
+            if (isUpdateAvailable) {
+                startActivity(
+                    Intent(this, AppUpdateActivity::class.java),
+                    ActivityOptions.makeCustomAnimation(
+                        this,
+                        android.R.anim.fade_in,
+                        android.R.anim.fade_out
+                    ).toBundle()
+                )
+            }
         }
     }
 
