@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     var livePositionAnnotationViews: MutableList<View> = mutableListOf()
 
     val pointDetailsVisibilityZoomThreshold = 11.75
+    val zoomedOutPointViewScale = 0.7f
 
     @SuppressLint("RtlHardcoded", "IncorrectNumberOfArgumentsInExpression")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,11 +109,16 @@ class MainActivity : AppCompatActivity() {
 
                 livePositionAnnotationViews.forEach {
                     val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
+                    val pointView: ImageView = it.findViewById(R.id.live_position_marker_point_view)
 
                     if (isZoomedOut) {
                         cardView.visibility = View.INVISIBLE
+                        pointView.scaleX = zoomedOutPointViewScale
+                        pointView.scaleY = zoomedOutPointViewScale
                     } else {
                         cardView.visibility = View.VISIBLE
+                        pointView.scaleX = 1.0f
+                        pointView.scaleY = 1.0f
                     }
                 }
             }
@@ -304,8 +310,12 @@ class MainActivity : AppCompatActivity() {
 
                             if (mapView.mapboxMap.cameraState.zoom < pointDetailsVisibilityZoomThreshold) {
                                 cardView.visibility = View.INVISIBLE
+                                pointView.scaleX = zoomedOutPointViewScale
+                                pointView.scaleY = zoomedOutPointViewScale
                             } else {
                                 cardView.visibility = View.VISIBLE
+                                pointView.scaleX = 1.0f
+                                pointView.scaleY = 1.0f
                             }
                         } else {
                             val prevPositionIndex = livePositionInfos.indexOf(prevPositionInfo)
