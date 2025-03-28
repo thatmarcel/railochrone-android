@@ -21,6 +21,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.android.core.permissions.PermissionsManager
+import com.mapbox.android.gestures.StandardScaleGestureDetector
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.ImageHolder
@@ -40,6 +41,8 @@ import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.PuckBearing
 import com.mapbox.maps.plugin.attribution.attribution
 import com.mapbox.maps.plugin.compass.compass
+import com.mapbox.maps.plugin.gestures.OnScaleListener
+import com.mapbox.maps.plugin.gestures.addOnScaleListener
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.logo.logo
 import com.mapbox.maps.plugin.scalebar.scalebar
@@ -62,6 +65,8 @@ class MainActivity : AppCompatActivity() {
 
     val livePositionInfos: MutableList<LivePositionInfo> = mutableListOf()
     var livePositionAnnotationViews: MutableList<View> = mutableListOf()
+
+    val pointDetailsVisibilityZoomThreshold = 13.0
 
     @SuppressLint("RtlHardcoded", "IncorrectNumberOfArgumentsInExpression")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,6 +101,26 @@ class MainActivity : AppCompatActivity() {
         loadMapStyle(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && resources.configuration.isNightModeActive)
 
         updateRealtimeDataAfterDelay()
+
+        mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
+            override fun onScale(detector: StandardScaleGestureDetector) {
+                val isZoomedOut = mapView.mapboxMap.cameraState.zoom < pointDetailsVisibilityZoomThreshold
+
+                livePositionAnnotationViews.forEach {
+                    val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
+
+                    if (isZoomedOut) {
+                        cardView.visibility = View.INVISIBLE
+                    } else {
+                        cardView.visibility = View.VISIBLE
+                    }
+                }
+            }
+
+            override fun onScaleBegin(detector: StandardScaleGestureDetector) { }
+
+            override fun onScaleEnd(detector: StandardScaleGestureDetector) { }
+        })
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -252,6 +277,36 @@ class MainActivity : AppCompatActivity() {
 
                             livePositionInfos.add(newLivePositionInfo)
                             livePositionAnnotationViews.add(annotationView)
+
+                            val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
+                            val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
+                            val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
+                            val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
+
+                            lineNameTextView.text = newLivePositionInfo.line
+                                .replace("S-Bahn ", "")
+                                .replace("R-Bahn ", "")
+                                .replace("Stadtbahn ", "")
+                                .replace("Bus ", "")
+
+                            directionTextView.text = newLivePositionInfo.direction
+
+                            if (newLivePositionInfo.type == "Bus") {
+                                pointView.setColorFilter(Color.rgb(179, 46, 45))
+                                cardView.setCardBackgroundColor(Color.rgb(179, 46, 45))
+                            } else if (newLivePositionInfo.type == "Stadtbahn") {
+                                pointView.setColorFilter(Color.rgb(65, 140, 195))
+                                cardView.setCardBackgroundColor(Color.rgb(65, 140, 195))
+                            } else {
+                                pointView.setColorFilter(Color.rgb(108, 177, 70))
+                                cardView.setCardBackgroundColor(Color.rgb(108, 177, 70))
+                            }
+
+                            if (mapView.mapboxMap.cameraState.zoom < pointDetailsVisibilityZoomThreshold) {
+                                cardView.visibility = View.INVISIBLE
+                            } else {
+                                cardView.visibility = View.VISIBLE
+                            }
                         } else {
                             val prevPositionIndex = livePositionInfos.indexOf(prevPositionInfo)
 
@@ -271,30 +326,6 @@ class MainActivity : AppCompatActivity() {
                                         .build()
                                 )
                             }
-                        }
-
-                        val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
-                        val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
-                        val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
-                        val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
-
-                        lineNameTextView.text = newLivePositionInfo.line
-                            .replace("S-Bahn ", "")
-                            .replace("R-Bahn ", "")
-                            .replace("Stadtbahn ", "")
-                            .replace("Bus ", "")
-
-                        directionTextView.text = newLivePositionInfo.direction
-
-                        if (newLivePositionInfo.type == "Bus") {
-                            pointView.setColorFilter(Color.rgb(179, 46, 45))
-                            cardView.setCardBackgroundColor(Color.rgb(179, 46, 45))
-                        } else if (newLivePositionInfo.type == "Stadtbahn") {
-                            pointView.setColorFilter(Color.rgb(65, 140, 195))
-                            cardView.setCardBackgroundColor(Color.rgb(65, 140, 195))
-                        } else {
-                            pointView.setColorFilter(Color.rgb(108, 177, 70))
-                            cardView.setCardBackgroundColor(Color.rgb(108, 177, 70))
                         }
                     }
                 }
