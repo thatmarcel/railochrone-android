@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
     val livePositionInfos: MutableList<LivePositionInfo> = mutableListOf()
     var livePositionAnnotationViews: MutableList<View> = mutableListOf()
 
-    val pointDetailsVisibilityZoomThreshold = 13.0
+    val pointDetailsVisibilityZoomThreshold = 11.75
 
     @SuppressLint("RtlHardcoded", "IncorrectNumberOfArgumentsInExpression")
     override fun onCreate(savedInstanceState: Bundle?) {
