@@ -66,8 +66,15 @@ class MainActivity : AppCompatActivity() {
     val livePositionInfos: MutableList<LivePositionInfo> = mutableListOf()
     var livePositionAnnotationViews: MutableList<View> = mutableListOf()
 
-    val pointDetailsVisibilityZoomThreshold = 11.75
-    val zoomedOutPointViewScale = 0.7f
+    val compactPointStyleAbsoluteZoomThreshold = 7.5
+    val compactPointStyleConditionalZoomThreshold = 11.75
+    val compactPointStyleConditionalPointCountThreshold = 30
+    val compactPointViewScale = 0.7f
+
+    val ultraCompactPointStyleAbsoluteZoomThreshold = 6.5
+    val ultraCompactPointViewScale = 0.5f
+
+    val viewportCoordinatePadding = 0.25
 
     @SuppressLint("RtlHardcoded", "IncorrectNumberOfArgumentsInExpression")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,16 +112,29 @@ class MainActivity : AppCompatActivity() {
 
         mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
             override fun onScale(detector: StandardScaleGestureDetector) {
-                val isZoomedOut = mapView.mapboxMap.cameraState.zoom < pointDetailsVisibilityZoomThreshold
+                val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
+                val shouldUseCompactPointStyle = (
+                    !shouldUseUltraCompactStyle &&
+                    mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
+                    (
+                        mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                        livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
+
+                    )
+                )
 
                 livePositionAnnotationViews.forEach {
                     val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
                     val pointView: ImageView = it.findViewById(R.id.live_position_marker_point_view)
 
-                    if (isZoomedOut) {
+                    if (shouldUseCompactPointStyle) {
                         cardView.visibility = View.INVISIBLE
-                        pointView.scaleX = zoomedOutPointViewScale
-                        pointView.scaleY = zoomedOutPointViewScale
+                        pointView.scaleX = compactPointViewScale
+                        pointView.scaleY = compactPointViewScale
+                    } else if (shouldUseUltraCompactStyle) {
+                        cardView.visibility = View.INVISIBLE
+                        pointView.scaleX = ultraCompactPointViewScale
+                        pointView.scaleY = ultraCompactPointViewScale
                     } else {
                         cardView.visibility = View.VISIBLE
                         pointView.scaleX = 1.0f
@@ -229,10 +249,10 @@ class MainActivity : AppCompatActivity() {
                 .build()
         )
 
-        val latMin = min(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude())
-        val lonMin = min(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude())
-        val latMax = max(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude())
-        val lonMax = max(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude())
+        val latMin = min(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude()) - viewportCoordinatePadding
+        val lonMin = min(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude()) - viewportCoordinatePadding
+        val latMax = max(coordinateBounds.northeast.latitude(), coordinateBounds.southwest.latitude()) + viewportCoordinatePadding
+        val lonMax = max(coordinateBounds.northeast.longitude(), coordinateBounds.southwest.longitude()) + viewportCoordinatePadding
 
         val url = "https://livekarte.vvs.de/proxy/livepositions?latMin=${latMin}&lonMin=${lonMin}&latMax=${latMax}&lonMax=${lonMax}"
 
@@ -283,40 +303,6 @@ class MainActivity : AppCompatActivity() {
 
                             livePositionInfos.add(newLivePositionInfo)
                             livePositionAnnotationViews.add(annotationView)
-
-                            val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
-                            val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
-                            val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
-                            val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
-
-                            lineNameTextView.text = newLivePositionInfo.line
-                                .replace("S-Bahn ", "")
-                                .replace("R-Bahn ", "")
-                                .replace("Stadtbahn ", "")
-                                .replace("Bus ", "")
-
-                            directionTextView.text = newLivePositionInfo.direction
-
-                            if (newLivePositionInfo.type == "Bus") {
-                                pointView.setColorFilter(Color.rgb(179, 46, 45))
-                                cardView.setCardBackgroundColor(Color.rgb(179, 46, 45))
-                            } else if (newLivePositionInfo.type == "Stadtbahn") {
-                                pointView.setColorFilter(Color.rgb(65, 140, 195))
-                                cardView.setCardBackgroundColor(Color.rgb(65, 140, 195))
-                            } else {
-                                pointView.setColorFilter(Color.rgb(108, 177, 70))
-                                cardView.setCardBackgroundColor(Color.rgb(108, 177, 70))
-                            }
-
-                            if (mapView.mapboxMap.cameraState.zoom < pointDetailsVisibilityZoomThreshold) {
-                                cardView.visibility = View.INVISIBLE
-                                pointView.scaleX = zoomedOutPointViewScale
-                                pointView.scaleY = zoomedOutPointViewScale
-                            } else {
-                                cardView.visibility = View.VISIBLE
-                                pointView.scaleX = 1.0f
-                                pointView.scaleY = 1.0f
-                            }
                         } else {
                             val prevPositionIndex = livePositionInfos.indexOf(prevPositionInfo)
 
@@ -336,6 +322,54 @@ class MainActivity : AppCompatActivity() {
                                         .build()
                                 )
                             }
+                        }
+
+                        val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
+                        val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
+                        val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
+                        val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
+
+                        lineNameTextView.text = newLivePositionInfo.line
+                            .replace("S-Bahn ", "")
+                            .replace("R-Bahn ", "")
+                            .replace("Stadtbahn ", "")
+                            .replace("Bus ", "")
+
+                        directionTextView.text = newLivePositionInfo.direction
+
+                        if (newLivePositionInfo.type == "Bus") {
+                            pointView.setColorFilter(Color.rgb(179, 46, 45))
+                            cardView.setCardBackgroundColor(Color.rgb(179, 46, 45))
+                        } else if (newLivePositionInfo.type == "Stadtbahn") {
+                            pointView.setColorFilter(Color.rgb(65, 140, 195))
+                            cardView.setCardBackgroundColor(Color.rgb(65, 140, 195))
+                        } else {
+                            pointView.setColorFilter(Color.rgb(108, 177, 70))
+                            cardView.setCardBackgroundColor(Color.rgb(108, 177, 70))
+                        }
+
+                        val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
+                        val shouldUseCompactPointStyle = (
+                            !shouldUseUltraCompactStyle &&
+                            mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
+                            (
+                                mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                                livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
+                            )
+                        )
+
+                        if (shouldUseCompactPointStyle) {
+                            cardView.visibility = View.INVISIBLE
+                            pointView.scaleX = compactPointViewScale
+                            pointView.scaleY = compactPointViewScale
+                        } else if (shouldUseUltraCompactStyle) {
+                            cardView.visibility = View.INVISIBLE
+                            pointView.scaleX = ultraCompactPointViewScale
+                            pointView.scaleY = ultraCompactPointViewScale
+                        } else {
+                            cardView.visibility = View.VISIBLE
+                            pointView.scaleX = 1.0f
+                            pointView.scaleY = 1.0f
                         }
                     }
                 }
