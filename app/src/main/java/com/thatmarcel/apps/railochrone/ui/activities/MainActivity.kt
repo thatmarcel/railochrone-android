@@ -112,43 +112,7 @@ class MainActivity : AppCompatActivity() {
 
         updateRealtimeDataAfterDelay()
 
-        mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
-            override fun onScale(detector: StandardScaleGestureDetector) {
-                val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
-                val shouldUseCompactPointStyle = (
-                    !shouldUseUltraCompactStyle &&
-                    mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
-                    (
-                        mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
-                        livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
-
-                    )
-                )
-
-                livePositionAnnotationViews.forEach {
-                    val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
-                    val pointView: ImageView = it.findViewById(R.id.live_position_marker_point_view)
-
-                    if (shouldUseCompactPointStyle) {
-                        cardView.visibility = View.INVISIBLE
-                        pointView.scaleX = compactPointViewScale
-                        pointView.scaleY = compactPointViewScale
-                    } else if (shouldUseUltraCompactStyle) {
-                        cardView.visibility = View.INVISIBLE
-                        pointView.scaleX = ultraCompactPointViewScale
-                        pointView.scaleY = ultraCompactPointViewScale
-                    } else {
-                        cardView.visibility = View.VISIBLE
-                        pointView.scaleX = 1.0f
-                        pointView.scaleY = 1.0f
-                    }
-                }
-            }
-
-            override fun onScaleBegin(detector: StandardScaleGestureDetector) { }
-
-            override fun onScaleEnd(detector: StandardScaleGestureDetector) { }
-        })
+        addMapScaleListener()
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -226,6 +190,46 @@ class MainActivity : AppCompatActivity() {
                 )
             })
         }
+    }
+
+    private fun addMapScaleListener() {
+        mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
+            override fun onScale(detector: StandardScaleGestureDetector) {
+                val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
+                val shouldUseCompactPointStyle = (
+                        !shouldUseUltraCompactStyle &&
+                                mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
+                                (
+                                        mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                                                livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
+
+                                        )
+                        )
+
+                livePositionAnnotationViews.forEach {
+                    val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
+                    val pointView: ImageView = it.findViewById(R.id.live_position_marker_point_view)
+
+                    if (shouldUseCompactPointStyle) {
+                        cardView.visibility = View.INVISIBLE
+                        pointView.scaleX = compactPointViewScale
+                        pointView.scaleY = compactPointViewScale
+                    } else if (shouldUseUltraCompactStyle) {
+                        cardView.visibility = View.INVISIBLE
+                        pointView.scaleX = ultraCompactPointViewScale
+                        pointView.scaleY = ultraCompactPointViewScale
+                    } else {
+                        cardView.visibility = View.VISIBLE
+                        pointView.scaleX = 1.0f
+                        pointView.scaleY = 1.0f
+                    }
+                }
+            }
+
+            override fun onScaleBegin(detector: StandardScaleGestureDetector) { }
+
+            override fun onScaleEnd(detector: StandardScaleGestureDetector) { }
+        })
     }
 
     private fun updateRealtimeDataAfterDelay() {
