@@ -49,8 +49,6 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
 
     implementation(libs.mapbox)
-
     implementation(libs.okhttp)
-
     implementation(libs.gson)
 }
