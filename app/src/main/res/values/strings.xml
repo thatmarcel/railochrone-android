@@ -5,4 +5,5 @@
     <string name="app_update_dialog_message">There\'s a new version of this app available.\n\nBecause the app isn\'t downloaded from the Play Store, you have to allow the installation from unknown sources.</string>
     <string name="app_update_dialog_later_button_text">Later</string>
     <string name="app_update_dialog_download_and_install_button_text">Download and install</string>
+    <string name="center_current_location_button_content_description">Re-center current location</string>
 </resources>

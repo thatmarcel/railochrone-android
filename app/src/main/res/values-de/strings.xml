@@ -4,4 +4,5 @@
     <string name="app_update_dialog_message">Es gibt eine neue Version dieser App. Lade sie jetzt herunter, um auf dem neuesten Stand zu bleiben.\n\nDa die App nicht aus dem Play Store kommt, musst du die Installation aus unbekannten Quellen erlauben.</string>
     <string name="app_update_dialog_later_button_text">Später</string>
     <string name="app_update_dialog_download_and_install_button_text">Herunterladen und installieren</string>
+    <string name="center_current_location_button_content_description">Aktuellen Standort zentrieren</string>
 </resources>

@@ -9,8 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mapbox.android.core.permissions.PermissionsListener
@@ -48,9 +51,9 @@ import com.mapbox.maps.plugin.logo.logo
 import com.mapbox.maps.plugin.scalebar.scalebar
 import com.mapbox.maps.plugin.viewport.viewport
 import com.mapbox.maps.viewannotation.geometry
+import com.thatmarcel.apps.railochrone.R
 import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
 import com.thatmarcel.apps.railochrone.helpers.types.LivePositionInfo
-import com.thatmarcel.apps.railochrone.R
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -62,6 +65,7 @@ import kotlin.math.min
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
+    private lateinit var centerCurrentLocationFloatingActionButton: FloatingActionButton
 
     val okHttpClient = OkHttpClient()
 
@@ -78,7 +82,6 @@ class MainActivity : AppCompatActivity() {
 
     val viewportCoordinatePadding = 0.25
 
-    @SuppressLint("RtlHardcoded", "IncorrectNumberOfArgumentsInExpression")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -86,24 +89,7 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        mapView = findViewById(R.id.activity_main_map_view)
-
-        mapView.scalebar.enabled = false
-        mapView.compass.enabled = false
-
-        mapView.logo.position = Gravity.BOTTOM or Gravity.LEFT
-        mapView.attribution.position = Gravity.BOTTOM or Gravity.LEFT
-
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
-            mapView.logo.marginBottom += systemBars.bottom + 2
-            mapView.logo.marginLeft += 24
-            mapView.attribution.marginBottom += systemBars.bottom + 2
-            mapView.attribution.marginLeft += 24
-
-            insets
-        }
+        setupViews()
 
         requestLocationPermission()
         showLocationPuck()
@@ -113,6 +99,45 @@ class MainActivity : AppCompatActivity() {
         updateRealtimeDataAfterDelay()
 
         addMapScaleListener()
+    }
+
+    @SuppressLint("RtlHardcoded")
+    private fun setupViews() {
+        mapView = findViewById(R.id.activity_main_map_view)
+        centerCurrentLocationFloatingActionButton = findViewById(R.id.activity_main_center_current_location_floating_action_button)
+
+        mapView.scalebar.enabled = false
+        mapView.compass.enabled = false
+
+        mapView.logo.position = Gravity.BOTTOM or Gravity.LEFT
+        mapView.attribution.position = Gravity.BOTTOM or Gravity.LEFT
+
+        centerCurrentLocationFloatingActionButton.setOnClickListener {
+            mapView.viewport.transitionTo(
+                targetState = mapView.viewport.makeFollowPuckViewportState(),
+                transition = mapView.viewport.makeImmediateViewportTransition()
+            )
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            mapView.logo.marginBottom += systemBars.bottom + 2
+            mapView.logo.marginLeft += 24
+            mapView.attribution.marginBottom += systemBars.bottom + 2
+            mapView.attribution.marginLeft += 24
+
+            val centerLocationButtonLayoutParams = centerCurrentLocationFloatingActionButton.layoutParams as ViewGroup.MarginLayoutParams
+            centerLocationButtonLayoutParams.setMargins(
+                centerLocationButtonLayoutParams.leftMargin + systemBars.left,
+                centerLocationButtonLayoutParams.topMargin,
+                centerLocationButtonLayoutParams.rightMargin + systemBars.right,
+                systemBars.bottom
+            )
+            centerCurrentLocationFloatingActionButton.layoutParams = centerLocationButtonLayoutParams
+
+            insets
+        }
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -411,20 +436,30 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super<AppCompatActivity>.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        val hasGrantedPermission = grantResults.any { it == 0 }
+
+        if (hasGrantedPermission) {
+            centerCurrentLocationFloatingActionButton.visibility = View.VISIBLE
+        }
+    }
+
     private fun requestLocationPermission() {
         val permissionsManager = PermissionsManager(object : PermissionsListener {
-            override fun onExplanationNeeded(permissionsToExplain: List<String>) {}
-            override fun onPermissionResult(granted: Boolean) {
-                if (granted) {
-                    restartApp()
-                } else {
-                    checkForUpdate()
-                }
-            }
+            override fun onExplanationNeeded(permissionsToExplain: List<String>) { }
+            override fun onPermissionResult(granted: Boolean) { }
         })
 
         if (PermissionsManager.Companion.areLocationPermissionsGranted(this)) {
             checkForUpdate()
+
+            centerCurrentLocationFloatingActionButton.visibility = View.VISIBLE
         } else {
             permissionsManager.requestLocationPermissions(this)
         }
@@ -443,13 +478,6 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
-    }
-
-    private fun restartApp() {
-        val intent = applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
-        val mainIntent = Intent.makeRestartActivityTask(intent?.component)
-        applicationContext.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

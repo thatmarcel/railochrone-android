@@ -44,4 +44,6 @@ dependencies {
     implementation(libs.mapboxLocationComponent)
 
     implementation(libs.okhttp)
+
+    implementation(libs.gson)
 }
