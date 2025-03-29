@@ -48,9 +48,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
-    implementation(libs.mapbox) {
-        exclude(group = "com.mapbox.module", module = "maps-telemetry")
-    }
+    implementation(libs.mapbox)
 
     // Needed for Mapbox (at least when minify is enabled)
     implementation(libs.gmsplayserviceslocation)
