@@ -1,6 +1,5 @@
 package com.thatmarcel.apps.railochrone.ui.activities
 
-import android.R
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -57,7 +56,7 @@ class AppUpdateActivity: AppCompatActivity() {
         setupView()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.fade_in, R.anim.fade_out)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, android.R.anim.fade_in, android.R.anim.fade_out)
         }
     }
 
@@ -183,7 +182,7 @@ class AppUpdateActivity: AppCompatActivity() {
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             @Suppress("DEPRECATION")
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         }
     }
 
