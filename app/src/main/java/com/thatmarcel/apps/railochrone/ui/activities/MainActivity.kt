@@ -447,6 +447,8 @@ class MainActivity : AppCompatActivity() {
         if (hasGrantedPermission) {
             centerCurrentLocationFloatingActionButton.visibility = View.VISIBLE
         }
+
+        checkForUpdate()
     }
 
     private fun requestLocationPermission() {
@@ -456,9 +458,9 @@ class MainActivity : AppCompatActivity() {
         })
 
         if (PermissionsManager.Companion.areLocationPermissionsGranted(this)) {
-            checkForUpdate()
-
             centerCurrentLocationFloatingActionButton.visibility = View.VISIBLE
+
+            checkForUpdate()
         } else {
             permissionsManager.requestLocationPermissions(this)
         }
