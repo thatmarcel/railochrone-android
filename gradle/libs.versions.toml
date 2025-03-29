@@ -7,10 +7,7 @@ material = "1.12.0"
 activity = "1.10.1"
 constraintlayout = "2.2.1"
 
-mapbox = "11.0.0"
-gmsplayserviceslocation = "21.3.0"
-kotlindatacompat = "0.9.0"
-
+mapbox = "11.11.0"
 okhttp = "4.12.0"
 gson = "2.12.1"
 
@@ -22,9 +19,6 @@ androidx-activity = { group = "androidx.activity", name = "activity", version.re
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 
 mapbox = { module = "com.mapbox.maps:android", version.ref = "mapbox" }
-gmsplayserviceslocation = { module = "com.google.android.gms:play-services-location", version.ref = "gmsplayserviceslocation" }
-kotlindatacompat-annotation = { module = "com.github.tobrun.kotlin-data-compat:annotation", version.ref = "kotlindatacompat" }
-
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 

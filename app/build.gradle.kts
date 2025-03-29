@@ -50,10 +50,6 @@ dependencies {
 
     implementation(libs.mapbox)
 
-    // Needed for Mapbox (at least when minify is enabled)
-    implementation(libs.gmsplayserviceslocation)
-    implementation(libs.kotlindatacompat.annotation)
-
     implementation(libs.okhttp)
 
     implementation(libs.gson)
