@@ -17,17 +17,25 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            ndk {
+                abiFilters += setOf("x86_64", "arm64-v8a")
+            }
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
@@ -40,8 +48,13 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
-    implementation(libs.mapbox)
-    implementation(libs.mapboxLocationComponent)
+    implementation(libs.mapbox) {
+        exclude(group = "com.mapbox.module", module = "maps-telemetry")
+    }
+
+    // Needed for Mapbox (at least when minify is enabled)
+    implementation(libs.gmsplayserviceslocation)
+    implementation(libs.kotlindatacompat.annotation)
 
     implementation(libs.okhttp)
 
