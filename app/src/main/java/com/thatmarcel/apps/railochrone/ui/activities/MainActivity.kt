@@ -266,7 +266,12 @@ class MainActivity : AppCompatActivity() {
                         mapView.viewAnnotationManager.removeAllViewAnnotations()
                         livePositionAnnotationViews = mutableListOf()
 
-                        livePositionInfos.forEach { addAnnotationCircle(it) }
+                        livePositionAnnotationCircles.addAll(
+                            circleAnnotationManager.create(
+                                livePositionInfos
+                                    .map { createAnnotationCircleOptions(it) }
+                            )
+                        )
                     }
                 }
             }
@@ -377,6 +382,8 @@ class MainActivity : AppCompatActivity() {
                             livePositionInfos.removeAt(index)
                         }
 
+                    val annotationCirclesToAdd: MutableList<CircleAnnotationOptions> = mutableListOf()
+
                     for (newLivePositionInfo in newLivePositionInfos) {
                         val prevPositionInfo = livePositionInfos.firstOrNull { it.id == newLivePositionInfo.id }
 
@@ -384,7 +391,7 @@ class MainActivity : AppCompatActivity() {
                             if (shouldUseNonCompactPointStyle) {
                                 addAnnotationView(newLivePositionInfo)
                             } else {
-                                addAnnotationCircle(newLivePositionInfo)
+                                annotationCirclesToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
                             }
 
                             livePositionInfos.add(newLivePositionInfo)
@@ -395,16 +402,16 @@ class MainActivity : AppCompatActivity() {
                                 if (shouldUseNonCompactPointStyle) {
                                     addAnnotationView(newLivePositionInfo)
                                 } else {
-                                    addAnnotationCircle(newLivePositionInfo)
+                                    annotationCirclesToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
                                 }
                             } else {
-                                if (shouldUseNonCompactPointStyle) {
-                                    val annotationView = livePositionAnnotationViews[prevPositionIndex]
+                                if (
+                                    prevPositionInfo.longitude != newLivePositionInfo.longitude ||
+                                    prevPositionInfo.latitude != newLivePositionInfo.latitude
+                                ) {
+                                    if (shouldUseNonCompactPointStyle) {
+                                        val annotationView = livePositionAnnotationViews[prevPositionIndex]
 
-                                    if (
-                                        prevPositionInfo.longitude != newLivePositionInfo.longitude ||
-                                        prevPositionInfo.latitude != newLivePositionInfo.latitude
-                                    ) {
                                         mapView.viewAnnotationManager.updateViewAnnotation(
                                             annotationView,
                                             ViewAnnotationOptions.Builder()
@@ -416,14 +423,14 @@ class MainActivity : AppCompatActivity() {
                                                 )
                                                 .build()
                                         )
+                                    } else {
+                                        val annotationCircle = livePositionAnnotationCircles[prevPositionIndex]
+                                        annotationCircle.point = Point.fromLngLat(
+                                            newLivePositionInfo.longitude,
+                                            newLivePositionInfo.latitude
+                                        )
+                                        circleAnnotationManager.update(annotationCircle)
                                     }
-                                } else {
-                                    val annotationCircle = livePositionAnnotationCircles[prevPositionIndex]
-                                    annotationCircle.point = Point.fromLngLat(
-                                        newLivePositionInfo.longitude,
-                                        newLivePositionInfo.latitude
-                                    )
-                                    circleAnnotationManager.update(annotationCircle)
                                 }
                             }
                         }
@@ -438,6 +445,10 @@ class MainActivity : AppCompatActivity() {
                             livePositionAnnotationViews = mutableListOf()
                         }
                     }
+
+                    livePositionAnnotationCircles.addAll(
+                        circleAnnotationManager.create(annotationCirclesToAdd)
+                    )
                 }
             }
         })
@@ -491,7 +502,7 @@ class MainActivity : AppCompatActivity() {
         return annotationView
     }
 
-    private fun addAnnotationCircle(livePositionInfo: LivePositionInfo): CircleAnnotation {
+    private fun createAnnotationCircleOptions(livePositionInfo: LivePositionInfo): CircleAnnotationOptions {
         @ColorInt val pointColor = getPointColorForLivePositionInfo(livePositionInfo)
 
         val circleAnnotationOptions = CircleAnnotationOptions()
@@ -504,11 +515,7 @@ class MainActivity : AppCompatActivity() {
             .withCircleColor(pointColor)
             .withCircleRadius(5.0)
 
-        val circleAnnotation = circleAnnotationManager.create(circleAnnotationOptions)
-
-        livePositionAnnotationCircles.add(circleAnnotation)
-
-        return circleAnnotation
+        return circleAnnotationOptions
     }
 
     private fun showLocationPuck() {
