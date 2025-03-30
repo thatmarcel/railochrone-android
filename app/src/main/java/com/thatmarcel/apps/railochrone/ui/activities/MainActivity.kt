@@ -17,6 +17,7 @@ import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.ColorInt
 import androidx.appcompat.app.AppCompatActivity
+import androidx.asynclayoutinflater.view.AsyncLayoutInflater
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.card.MaterialCardView
@@ -25,6 +26,8 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.android.core.permissions.PermissionsManager
+import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.android.gestures.RotateGestureDetector
 import com.mapbox.android.gestures.StandardScaleGestureDetector
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
@@ -50,7 +53,11 @@ import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
 import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
 import com.mapbox.maps.plugin.attribution.attribution
 import com.mapbox.maps.plugin.compass.compass
+import com.mapbox.maps.plugin.gestures.OnMoveListener
+import com.mapbox.maps.plugin.gestures.OnRotateListener
 import com.mapbox.maps.plugin.gestures.OnScaleListener
+import com.mapbox.maps.plugin.gestures.addOnMoveListener
+import com.mapbox.maps.plugin.gestures.addOnRotateListener
 import com.mapbox.maps.plugin.gestures.addOnScaleListener
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.logo.logo
@@ -83,12 +90,14 @@ class MainActivity : AppCompatActivity() {
     var livePositionAnnotationCircles: MutableList<CircleAnnotation> = mutableListOf()
 
     val compactPointStyleAbsoluteZoomThreshold = 7.5
-    val compactPointStyleConditionalZoomThreshold = 12.75
-    val compactPointStyleConditionalPointCountThreshold = 50
+    val compactPointStyleConditionalZoomThreshold = 13.5
+    val compactPointStyleConditionalPointCountThreshold = 15
 
     val ultraCompactPointStyleAbsoluteZoomThreshold = 6.5
 
     val viewportCoordinatePadding = 0.25
+
+    private lateinit var asyncLayoutInflater: AsyncLayoutInflater
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,6 +161,8 @@ class MainActivity : AppCompatActivity() {
         mapView.viewAnnotationManager.setViewAnnotationUpdateMode(
             ViewAnnotationUpdateMode.MAP_FIXED_DELAY
         )
+
+        asyncLayoutInflater = AsyncLayoutInflater(this)
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -234,53 +245,107 @@ class MainActivity : AppCompatActivity() {
     private fun addMapScaleListener() {
         mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
             override fun onScale(detector: StandardScaleGestureDetector) {
-                val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
-                val shouldUseCompactPointStyle = (
-                    !shouldUseUltraCompactStyle &&
-                    mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
-                    (
-                        mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
-                        livePositionInfos.size > compactPointStyleConditionalPointCountThreshold
-                    )
-                )
-                val shouldUseNonCompactPointStyle = !shouldUseUltraCompactStyle && !shouldUseCompactPointStyle
-
-                val isChangingPointAnnotationType = (
-                    (
-                        shouldUseNonCompactPointStyle &&
-                        livePositionAnnotationViews.isEmpty() &&
-                        livePositionAnnotationCircles.isNotEmpty()
-                    ) || (
-                        !shouldUseNonCompactPointStyle &&
-                        livePositionAnnotationViews.isNotEmpty() &&
-                        livePositionAnnotationCircles.isEmpty()
-                    )
-                )
-
-                if (isChangingPointAnnotationType) {
-                    if (shouldUseNonCompactPointStyle) {
-                        circleAnnotationManager.deleteAll()
-                        livePositionAnnotationCircles = mutableListOf()
-
-                        livePositionInfos.forEach { addAnnotationView(it) }
-                    } else {
-                        mapView.viewAnnotationManager.removeAllViewAnnotations()
-                        livePositionAnnotationViews = mutableListOf()
-
-                        livePositionAnnotationCircles.addAll(
-                            circleAnnotationManager.create(
-                                livePositionInfos
-                                    .map { createAnnotationCircleOptions(it) }
-                            )
-                        )
-                    }
-                }
+                updatePointAnnotations()
             }
 
             override fun onScaleBegin(detector: StandardScaleGestureDetector) { }
-
             override fun onScaleEnd(detector: StandardScaleGestureDetector) { }
         })
+
+        mapView.mapboxMap.addOnMoveListener(object : OnMoveListener {
+            override fun onMove(detector: MoveGestureDetector): Boolean {
+                updatePointAnnotations()
+
+                return false
+            }
+
+            override fun onMoveBegin(detector: MoveGestureDetector) { }
+            override fun onMoveEnd(detector: MoveGestureDetector) { }
+        })
+
+        mapView.mapboxMap.addOnRotateListener(object : OnRotateListener {
+            override fun onRotate(detector: RotateGestureDetector) {
+                updatePointAnnotations()
+            }
+
+            override fun onRotateBegin(detector: RotateGestureDetector) { }
+            override fun onRotateEnd(detector: RotateGestureDetector) { }
+        })
+    }
+
+    private fun updatePointAnnotations() {
+        val cameraState = mapView.mapboxMap.cameraState
+
+        val coordinateBounds = mapView.mapboxMap.coordinateBoundsForCamera(
+            CameraOptions.Builder()
+                .zoom(cameraState.zoom)
+                .pitch(cameraState.pitch)
+                .bearing(cameraState.bearing)
+                .center(cameraState.center)
+                .padding(cameraState.padding)
+                .build()
+        )
+
+        val latMin = min(
+            coordinateBounds.northeast.latitude(),
+            coordinateBounds.southwest.latitude()
+        )
+        val lonMin = min(
+            coordinateBounds.northeast.longitude(),
+            coordinateBounds.southwest.longitude()
+        )
+        val latMax = max(
+            coordinateBounds.northeast.latitude(),
+            coordinateBounds.southwest.latitude()
+        )
+        val lonMax = max(
+            coordinateBounds.northeast.longitude(),
+            coordinateBounds.southwest.longitude()
+        )
+
+        val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
+        val shouldUseCompactPointStyle = (
+            !shouldUseUltraCompactStyle &&
+                mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
+                (
+                    mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                        livePositionInfos
+                            .filter { it.latitude in latMin..latMax && it.longitude in lonMin..lonMax }
+                            .size > compactPointStyleConditionalPointCountThreshold
+                    )
+            )
+        val shouldUseNonCompactPointStyle = !shouldUseUltraCompactStyle && !shouldUseCompactPointStyle
+
+        val isChangingPointAnnotationType = (
+            (
+                shouldUseNonCompactPointStyle &&
+                    livePositionAnnotationViews.isEmpty() &&
+                    livePositionAnnotationCircles.isNotEmpty()
+                ) || (
+                !shouldUseNonCompactPointStyle &&
+                    livePositionAnnotationViews.isNotEmpty() &&
+                    livePositionAnnotationCircles.isEmpty()
+                )
+            )
+
+        if (isChangingPointAnnotationType) {
+            if (shouldUseNonCompactPointStyle) {
+                circleAnnotationManager.deleteAll()
+                livePositionAnnotationCircles = mutableListOf()
+
+                livePositionInfos.forEach { addAnnotationView(it) }
+            } else {
+                mapView.viewAnnotationManager.removeAllViewAnnotations()
+                livePositionAnnotationViews = mutableListOf()
+
+                livePositionAnnotationCircles.addAll(
+                    circleAnnotationManager.create(
+                        livePositionInfos
+                            .map { createAnnotationCircleOptions(it) }
+                    )
+                )
+            }
+        }
     }
 
     private fun updateRealtimeDataAfterDelay() {
@@ -290,7 +355,7 @@ class MainActivity : AppCompatActivity() {
             if (!isDestroyed) {
                 updateRealtimeDataAfterDelay()
             }
-        }, 1000)
+        }, 2500)
     }
 
     private fun updateRealtimeData() {
@@ -309,21 +374,29 @@ class MainActivity : AppCompatActivity() {
         val latMin = min(
             coordinateBounds.northeast.latitude(),
             coordinateBounds.southwest.latitude()
-        ) - viewportCoordinatePadding
+        )
         val lonMin = min(
             coordinateBounds.northeast.longitude(),
             coordinateBounds.southwest.longitude()
-        ) - viewportCoordinatePadding
+        )
         val latMax = max(
             coordinateBounds.northeast.latitude(),
             coordinateBounds.southwest.latitude()
-        ) + viewportCoordinatePadding
+        )
         val lonMax = max(
             coordinateBounds.northeast.longitude(),
             coordinateBounds.southwest.longitude()
-        ) + viewportCoordinatePadding
+        )
 
-        val url = "https://livekarte.vvs.de/proxy/livepositions?latMin=${latMin}&lonMin=${lonMin}&latMax=${latMax}&lonMax=${lonMax}"
+        val url = "https://livekarte.vvs.de/proxy/livepositions?latMin=${
+            latMin - viewportCoordinatePadding
+        }&lonMin=${
+            lonMin - viewportCoordinatePadding
+        }&latMax=${
+            latMax + viewportCoordinatePadding
+        }&lonMax=${
+            lonMax + viewportCoordinatePadding
+        }"
 
         val request = Request.Builder()
             .url(url)
@@ -347,7 +420,9 @@ class MainActivity : AppCompatActivity() {
                         mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
                         (
                             mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
-                            newLivePositionInfos.size > compactPointStyleConditionalPointCountThreshold
+                            newLivePositionInfos
+                                .filter { it.latitude in latMin..latMax && it.longitude in lonMin..lonMax }
+                                .size > compactPointStyleConditionalPointCountThreshold
                         )
                     )
                     val shouldUseNonCompactPointStyle = !shouldUseUltraCompactStyle && !shouldUseCompactPointStyle
@@ -469,10 +544,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addAnnotationView(livePositionInfo: LivePositionInfo): View {
+    private fun addAnnotationView(livePositionInfo: LivePositionInfo) {
         @ColorInt val pointColor = getPointColorForLivePositionInfo(livePositionInfo)
 
-        val annotationView = mapView.viewAnnotationManager.addViewAnnotation(
+        val placeholderView = View(this)
+
+        mapView.viewAnnotationManager.addViewAnnotation(
             R.layout.live_position_marker,
             ViewAnnotationOptions.Builder()
                 .geometry(
@@ -482,28 +559,33 @@ class MainActivity : AppCompatActivity() {
                     ))
                 .allowOverlap(true)
                 .allowOverlapWithPuck(true)
-                .build()
-        )
+                .build(),
+            asyncLayoutInflater
+        ) { annotationView ->
+            val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
+            val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
+            val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
+            val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
 
-        val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
-        val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
-        val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
-        val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
+            lineNameTextView.text = livePositionInfo.line
+                .replace("S-Bahn ", "")
+                .replace("R-Bahn ", "")
+                .replace("Stadtbahn ", "")
+                .replace("Bus ", "")
 
-        lineNameTextView.text = livePositionInfo.line
-            .replace("S-Bahn ", "")
-            .replace("R-Bahn ", "")
-            .replace("Stadtbahn ", "")
-            .replace("Bus ", "")
+            directionTextView.text = livePositionInfo.direction
 
-        directionTextView.text = livePositionInfo.direction
+            pointView.setColorFilter(pointColor)
+            cardView.setCardBackgroundColor(pointColor)
 
-        pointView.setColorFilter(pointColor)
-        cardView.setCardBackgroundColor(pointColor)
+            val placeholderViewIndex = livePositionAnnotationViews.indexOf(placeholderView)
 
-        livePositionAnnotationViews.add(annotationView)
+            if (placeholderViewIndex != -1) {
+                livePositionAnnotationViews[placeholderViewIndex] = annotationView
+            }
+        }
 
-        return annotationView
+        livePositionAnnotationViews.add(placeholderView)
     }
 
     private fun createAnnotationCircleOptions(livePositionInfo: LivePositionInfo): CircleAnnotationOptions {
