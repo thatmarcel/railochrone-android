@@ -67,6 +67,8 @@ import com.mapbox.maps.viewannotation.ViewAnnotationUpdateMode
 import com.mapbox.maps.viewannotation.geometry
 import com.thatmarcel.apps.railochrone.R
 import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
+import com.thatmarcel.apps.railochrone.helpers.types.DistanceCalculator
+import com.thatmarcel.apps.railochrone.helpers.types.LivePositionDisplayInfo
 import com.thatmarcel.apps.railochrone.helpers.types.LivePositionInfo
 import okhttp3.Call
 import okhttp3.Callback
@@ -85,19 +87,19 @@ class MainActivity : AppCompatActivity() {
 
     val okHttpClient = OkHttpClient()
 
-    val livePositionInfos: MutableList<LivePositionInfo> = mutableListOf()
-    var livePositionAnnotationViews: MutableList<View> = mutableListOf()
-    var livePositionAnnotationCircles: MutableList<CircleAnnotation> = mutableListOf()
+    val livePositionDisplayInfos: MutableList<LivePositionDisplayInfo> = mutableListOf()
 
     val compactPointStyleAbsoluteZoomThreshold = 7.5
-    val compactPointStyleConditionalZoomThreshold = 13.5
-    val compactPointStyleConditionalPointCountThreshold = 15
+    val compactPointStyleConditionalZoomThreshold = 12.75
+    val compactPointStyleConditionalPointCountThreshold = 25
 
-    val ultraCompactPointStyleAbsoluteZoomThreshold = 6.5
+    val maxNumberOfLivePositionPoints = 75
 
     val viewportCoordinatePadding = 0.25
 
     private lateinit var asyncLayoutInflater: AsyncLayoutInflater
+
+    private lateinit var cachedLivePositionAnnotationViews: MutableList<View>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,7 +117,7 @@ class MainActivity : AppCompatActivity() {
 
         updateRealtimeDataAfterDelay()
 
-        addMapScaleListener()
+        addMapListeners()
     }
 
     @SuppressLint("RtlHardcoded")
@@ -163,6 +165,28 @@ class MainActivity : AppCompatActivity() {
         )
 
         asyncLayoutInflater = AsyncLayoutInflater(this)
+
+        val livePositionAnnotationViewsToBeCached: MutableList<View> = mutableListOf()
+        repeat(maxNumberOfLivePositionPoints) {
+            mapView.viewAnnotationManager.addViewAnnotation(
+                R.layout.live_position_marker,
+                ViewAnnotationOptions.Builder()
+                    .visible(false)
+                    .geometry(
+                        Point.fromLngLat(9.177, 48.773)
+                    )
+                    .allowOverlap(true)
+                    .allowOverlapWithPuck(true)
+                    .build(),
+                asyncLayoutInflater
+            ) { annotationView ->
+                livePositionAnnotationViewsToBeCached.add(annotationView)
+
+                if (livePositionAnnotationViewsToBeCached.size == maxNumberOfLivePositionPoints) {
+                    cachedLivePositionAnnotationViews = livePositionAnnotationViewsToBeCached
+                }
+            }
+        }
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -242,7 +266,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addMapScaleListener() {
+    private fun addMapListeners() {
         mapView.mapboxMap.addOnScaleListener(object : OnScaleListener {
             override fun onScale(detector: StandardScaleGestureDetector) {
                 updatePointAnnotations()
@@ -303,47 +327,37 @@ class MainActivity : AppCompatActivity() {
             coordinateBounds.southwest.longitude()
         )
 
-        val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
         val shouldUseCompactPointStyle = (
-            !shouldUseUltraCompactStyle &&
-                mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
-                (
-                    mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
-                        livePositionInfos
-                            .filter { it.latitude in latMin..latMax && it.longitude in lonMin..lonMax }
-                            .size > compactPointStyleConditionalPointCountThreshold
-                    )
-            )
-        val shouldUseNonCompactPointStyle = !shouldUseUltraCompactStyle && !shouldUseCompactPointStyle
-
-        val isChangingPointAnnotationType = (
+            mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
             (
-                shouldUseNonCompactPointStyle &&
-                    livePositionAnnotationViews.isEmpty() &&
-                    livePositionAnnotationCircles.isNotEmpty()
-                ) || (
-                !shouldUseNonCompactPointStyle &&
-                    livePositionAnnotationViews.isNotEmpty() &&
-                    livePositionAnnotationCircles.isEmpty()
-                )
+                mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                livePositionDisplayInfos
+                    .filter { it.positionInfo.latitude in latMin..latMax && it.positionInfo.longitude in lonMin..lonMax }
+                    .size > compactPointStyleConditionalPointCountThreshold
             )
+        )
+
+        val isChangingPointAnnotationType = livePositionDisplayInfos
+            .firstOrNull()
+            ?.isCompact() == !shouldUseCompactPointStyle
 
         if (isChangingPointAnnotationType) {
-            if (shouldUseNonCompactPointStyle) {
-                circleAnnotationManager.deleteAll()
-                livePositionAnnotationCircles = mutableListOf()
+            if (shouldUseCompactPointStyle) {
+                circleAnnotationManager.create(
+                    livePositionDisplayInfos
+                        .map { createAnnotationCircleOptions(it.positionInfo) }
+                ).forEachIndexed { circleAnnotationIndex, circleAnnotation ->
+                    val livePositionDisplayInfo = livePositionDisplayInfos[circleAnnotationIndex]
 
-                livePositionInfos.forEach { addAnnotationView(it) }
+                    hideAnnotationViewForDisplayInfo(livePositionDisplayInfo)
+                    livePositionDisplayInfo.circleAnnotation = circleAnnotation
+                }
             } else {
-                mapView.viewAnnotationManager.removeAllViewAnnotations()
-                livePositionAnnotationViews = mutableListOf()
-
-                livePositionAnnotationCircles.addAll(
-                    circleAnnotationManager.create(
-                        livePositionInfos
-                            .map { createAnnotationCircleOptions(it) }
-                    )
-                )
+                circleAnnotationManager.deleteAll()
+                livePositionDisplayInfos.forEachIndexed { i, it ->
+                    it.circleAnnotation = null
+                    showAnnotationViewForDisplayInfo(it)
+                }
             }
         }
     }
@@ -357,6 +371,7 @@ class MainActivity : AppCompatActivity() {
             }
         }, 2500)
     }
+
 
     private fun updateRealtimeData() {
         val cameraState = mapView.mapboxMap.cameraState
@@ -388,6 +403,9 @@ class MainActivity : AppCompatActivity() {
             coordinateBounds.southwest.longitude()
         )
 
+        val latCenter = mapView.mapboxMap.cameraState.center.latitude()
+        val lonCenter = mapView.mapboxMap.cameraState.center.longitude()
+
         val url = "https://livekarte.vvs.de/proxy/livepositions?latMin=${
             latMin - viewportCoordinatePadding
         }&lonMin=${
@@ -408,15 +426,22 @@ class MainActivity : AppCompatActivity() {
             override fun onResponse(call: Call, response: Response) {
                 val responseBodyString = response.body?.string() ?: return
 
-                val newLivePositionInfos: List<LivePositionInfo> = Gson().fromJson(
+                var newLivePositionInfos: List<LivePositionInfo> = Gson().fromJson(
                     responseBodyString,
                     object : TypeToken<List<LivePositionInfo>>() {}.type
                 )
 
+                newLivePositionInfos = newLivePositionInfos.sortedBy {
+                    DistanceCalculator.calculateDistanceBetweenCoordinates(
+                        latCenter,
+                        lonCenter,
+                        it.latitude,
+                        it.longitude
+                    )
+                }
+
                 Handler(Looper.getMainLooper()).post {
-                    val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
                     val shouldUseCompactPointStyle = (
-                        !shouldUseUltraCompactStyle &&
                         mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
                         (
                             mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
@@ -425,109 +450,133 @@ class MainActivity : AppCompatActivity() {
                                 .size > compactPointStyleConditionalPointCountThreshold
                         )
                     )
-                    val shouldUseNonCompactPointStyle = !shouldUseUltraCompactStyle && !shouldUseCompactPointStyle
 
-                    val isChangingPointAnnotationType = (
-                        (
-                            shouldUseNonCompactPointStyle &&
-                            livePositionAnnotationViews.isEmpty() &&
-                            livePositionAnnotationCircles.isNotEmpty()
-                        ) || (
-                            !shouldUseNonCompactPointStyle &&
-                            livePositionAnnotationViews.isNotEmpty() &&
-                            livePositionAnnotationCircles.isEmpty()
-                        )
-                    )
+                    val isChangingPointAnnotationType = livePositionDisplayInfos
+                        .firstOrNull()
+                        ?.isCompact() == !shouldUseCompactPointStyle
 
-                    livePositionInfos
-                        .filter { a -> newLivePositionInfos.none { b -> a.id == b.id } }
-                        .forEach {
-                            val index = livePositionInfos.indexOf(it)
-
+                    livePositionDisplayInfos
+                        .toList()
+                        .forEach { a ->
                             if (
-                                (shouldUseNonCompactPointStyle && !isChangingPointAnnotationType) ||
-                                (!shouldUseNonCompactPointStyle && isChangingPointAnnotationType)
+                                newLivePositionInfos.none { b -> a.positionInfo.id == b.id } ||
+                                (
+                                    !shouldUseCompactPointStyle &&
+                                    newLivePositionInfos.indexOfFirst { b ->
+                                        b.id == a.positionInfo.id
+                                    } >= maxNumberOfLivePositionPoints
+                                )
                             ) {
-                                mapView.viewAnnotationManager.removeViewAnnotation(livePositionAnnotationViews[index])
-                                livePositionAnnotationViews.removeAt(index)
-                            } else {
-                                circleAnnotationManager.delete(livePositionAnnotationCircles[index])
-                                livePositionAnnotationCircles.removeAt(index)
-                            }
+                                if (a.isCompact()) {
+                                    circleAnnotationManager.delete(a.circleAnnotation!!)
+                                    a.circleAnnotation = null
+                                } else {
+                                    hideAnnotationViewForDisplayInfo(a)
+                                }
 
-                            livePositionInfos.removeAt(index)
+                                livePositionDisplayInfos.remove(a)
+                            }
                         }
 
-                    val annotationCircleOptionsToAdd: MutableList<CircleAnnotationOptions> = mutableListOf()
                     val annotationCirclesToUpdate: MutableList<CircleAnnotation> = mutableListOf()
+                    val annotationCirclesToRemove: MutableList<CircleAnnotation> = mutableListOf()
 
-                    for (newLivePositionInfo in newLivePositionInfos) {
-                        val prevPositionInfo = livePositionInfos.firstOrNull { it.id == newLivePositionInfo.id }
+                    newLivePositionInfos.forEachIndexed { newLivePositionInfoIndex, newLivePositionInfo ->
+                        val prevPositionDisplayInfo = livePositionDisplayInfos
+                            .firstOrNull { it.positionInfo.id == newLivePositionInfo.id }
 
-                        if (prevPositionInfo == null) {
-                            if (shouldUseNonCompactPointStyle) {
-                                addAnnotationView(newLivePositionInfo)
+                        if (prevPositionDisplayInfo == null) {
+                            val newPositionDisplayInfo = LivePositionDisplayInfo(
+                                newLivePositionInfo,
+                                null,
+                                null,
+                                null
+                            )
+
+                            if (shouldUseCompactPointStyle) {
+                                newPositionDisplayInfo.circleAnnotationOptions = createAnnotationCircleOptions(newLivePositionInfo)
                             } else {
-                                annotationCircleOptionsToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
+                                showAnnotationViewForDisplayInfo(newPositionDisplayInfo)
                             }
 
-                            livePositionInfos.add(newLivePositionInfo)
+                            livePositionDisplayInfos.add(newPositionDisplayInfo)
                         } else {
-                            val prevPositionIndex = livePositionInfos.indexOf(prevPositionInfo)
-
                             if (isChangingPointAnnotationType) {
-                                if (shouldUseNonCompactPointStyle) {
-                                    addAnnotationView(newLivePositionInfo)
+                                prevPositionDisplayInfo.positionInfo = newLivePositionInfo
+
+                                if (shouldUseCompactPointStyle) {
+                                    hideAnnotationViewForDisplayInfo(prevPositionDisplayInfo)
+
+                                    prevPositionDisplayInfo.circleAnnotationOptions = createAnnotationCircleOptions(newLivePositionInfo)
                                 } else {
-                                    annotationCircleOptionsToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
+                                    annotationCirclesToRemove.add(prevPositionDisplayInfo.circleAnnotation!!)
+                                    prevPositionDisplayInfo.circleAnnotation = null
+                                    showAnnotationViewForDisplayInfo(prevPositionDisplayInfo)
                                 }
                             } else {
                                 if (
-                                    prevPositionInfo.longitude != newLivePositionInfo.longitude ||
-                                    prevPositionInfo.latitude != newLivePositionInfo.latitude
+                                    prevPositionDisplayInfo.positionInfo.longitude != newLivePositionInfo.longitude ||
+                                    prevPositionDisplayInfo.positionInfo.latitude != newLivePositionInfo.latitude
                                 ) {
-                                    if (shouldUseNonCompactPointStyle) {
-                                        val annotationView = livePositionAnnotationViews[prevPositionIndex]
+                                    prevPositionDisplayInfo.positionInfo = newLivePositionInfo
 
-                                        mapView.viewAnnotationManager.updateViewAnnotation(
-                                            annotationView,
-                                            ViewAnnotationOptions.Builder()
-                                                .geometry(
-                                                    Point.fromLngLat(
-                                                        newLivePositionInfo.longitude,
-                                                        newLivePositionInfo.latitude
-                                                    )
-                                                )
-                                                .build()
-                                        )
-                                    } else {
-                                        val annotationCircle = livePositionAnnotationCircles[prevPositionIndex]
+                                    if (shouldUseCompactPointStyle) {
+                                        val annotationCircle = prevPositionDisplayInfo.circleAnnotation!!
+
                                         annotationCircle.point = Point.fromLngLat(
                                             newLivePositionInfo.longitude,
                                             newLivePositionInfo.latitude
                                         )
+
                                         annotationCirclesToUpdate.add(annotationCircle)
+                                    } else {
+                                        val annotationView = prevPositionDisplayInfo.annotationView
+
+                                        if (annotationView != null) {
+                                            mapView.viewAnnotationManager.updateViewAnnotation(
+                                                annotationView,
+                                                ViewAnnotationOptions.Builder()
+                                                    .geometry(
+                                                        Point.fromLngLat(
+                                                            newLivePositionInfo.longitude,
+                                                            newLivePositionInfo.latitude
+                                                        )
+                                                    )
+                                                    .build()
+                                            )
+                                        } else {
+                                            showAnnotationViewForDisplayInfo(prevPositionDisplayInfo)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    if (isChangingPointAnnotationType) {
-                        if (shouldUseNonCompactPointStyle) {
-                            circleAnnotationManager.deleteAll()
-                            livePositionAnnotationCircles = mutableListOf()
-                        } else {
-                            mapView.viewAnnotationManager.removeAllViewAnnotations()
-                            livePositionAnnotationViews = mutableListOf()
-                        }
+                    val livePositionDisplayInfosWithCircleAnnotationsToAdd = livePositionDisplayInfos
+                        .filter { it.circleAnnotationOptions != null }
+
+                    circleAnnotationManager.create(
+                        livePositionDisplayInfosWithCircleAnnotationsToAdd
+                            .map { it.circleAnnotationOptions!! }
+                    ).forEachIndexed { circleAnnotationIndex, circleAnnotation ->
+                        val livePositionDisplayInfo = livePositionDisplayInfosWithCircleAnnotationsToAdd[circleAnnotationIndex]
+
+                        livePositionDisplayInfo.circleAnnotationOptions = null
+                        livePositionDisplayInfo.circleAnnotation = circleAnnotation
                     }
 
-                    livePositionAnnotationCircles.addAll(
-                        circleAnnotationManager.create(annotationCircleOptionsToAdd)
-                    )
-
                     circleAnnotationManager.update(annotationCirclesToUpdate)
+                    circleAnnotationManager.delete(annotationCirclesToRemove)
+
+                    livePositionDisplayInfos.sortBy {
+                        DistanceCalculator.calculateDistanceBetweenCoordinates(
+                            latCenter,
+                            lonCenter,
+                            it.positionInfo.latitude,
+                            it.positionInfo.longitude
+                        )
+                    }
                 }
             }
         })
@@ -544,48 +593,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addAnnotationView(livePositionInfo: LivePositionInfo) {
-        @ColorInt val pointColor = getPointColorForLivePositionInfo(livePositionInfo)
-
-        val placeholderView = View(this)
-
-        mapView.viewAnnotationManager.addViewAnnotation(
-            R.layout.live_position_marker,
-            ViewAnnotationOptions.Builder()
-                .geometry(
-                    Point.fromLngLat(
-                        livePositionInfo.longitude,
-                        livePositionInfo.latitude
-                    ))
-                .allowOverlap(true)
-                .allowOverlapWithPuck(true)
-                .build(),
-            asyncLayoutInflater
-        ) { annotationView ->
-            val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
-            val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
-            val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
-            val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
-
-            lineNameTextView.text = livePositionInfo.line
-                .replace("S-Bahn ", "")
-                .replace("R-Bahn ", "")
-                .replace("Stadtbahn ", "")
-                .replace("Bus ", "")
-
-            directionTextView.text = livePositionInfo.direction
-
-            pointView.setColorFilter(pointColor)
-            cardView.setCardBackgroundColor(pointColor)
-
-            val placeholderViewIndex = livePositionAnnotationViews.indexOf(placeholderView)
-
-            if (placeholderViewIndex != -1) {
-                livePositionAnnotationViews[placeholderViewIndex] = annotationView
-            }
+    private fun showAnnotationViewForDisplayInfo(livePositionDisplayInfo: LivePositionDisplayInfo) {
+        if (cachedLivePositionAnnotationViews.isEmpty()) {
+            return
         }
 
-        livePositionAnnotationViews.add(placeholderView)
+        @ColorInt val pointColor = getPointColorForLivePositionInfo(livePositionDisplayInfo.positionInfo)
+
+        val annotationView = cachedLivePositionAnnotationViews.removeAt(0)
+
+        val lineNameTextView: TextView = annotationView.findViewById(R.id.live_position_marker_line_name_text_view)
+        val directionTextView: TextView = annotationView.findViewById(R.id.live_position_marker_direction_text_view)
+        val pointView: ImageView = annotationView.findViewById(R.id.live_position_marker_point_view)
+        val cardView: MaterialCardView = annotationView.findViewById(R.id.live_position_marker_card_view)
+
+        lineNameTextView.text = livePositionDisplayInfo.positionInfo.line
+            .replace("S-Bahn ", "")
+            .replace("R-Bahn ", "")
+            .replace("Stadtbahn ", "")
+            .replace("Bus ", "")
+
+        directionTextView.text = livePositionDisplayInfo.positionInfo.direction
+
+        pointView.setColorFilter(pointColor)
+        cardView.setCardBackgroundColor(pointColor)
+
+        mapView.viewAnnotationManager.updateViewAnnotation(
+            annotationView,
+            ViewAnnotationOptions.Builder()
+                .geometry(
+                    Point.fromLngLat(livePositionDisplayInfo.positionInfo.longitude, livePositionDisplayInfo.positionInfo.latitude)
+                )
+                .visible(true)
+                .build()
+        )
+
+        livePositionDisplayInfo.annotationView = annotationView
+
+        return
+    }
+
+    private fun hideAnnotationViewForDisplayInfo(livePositionDisplayInfo: LivePositionDisplayInfo) {
+        if (livePositionDisplayInfo.annotationView == null) {
+            return
+        }
+
+        cachedLivePositionAnnotationViews.add(livePositionDisplayInfo.annotationView!!)
+
+        mapView.viewAnnotationManager.updateViewAnnotation(
+            livePositionDisplayInfo.annotationView!!,
+            ViewAnnotationOptions.Builder()
+                .visible(false)
+                .build()
+        )
+
+        livePositionDisplayInfo.annotationView = null
     }
 
     private fun createAnnotationCircleOptions(livePositionInfo: LivePositionInfo): CircleAnnotationOptions {
