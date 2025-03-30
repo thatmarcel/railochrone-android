@@ -72,8 +72,8 @@ class MainActivity : AppCompatActivity() {
     var livePositionAnnotationViews: MutableList<View> = mutableListOf()
 
     val compactPointStyleAbsoluteZoomThreshold = 7.5
-    val compactPointStyleConditionalZoomThreshold = 11.75
-    val compactPointStyleConditionalPointCountThreshold = 30
+    val compactPointStyleConditionalZoomThreshold = 12.75
+    val compactPointStyleConditionalPointCountThreshold = 50
     val compactPointViewScale = 0.7f
 
     val ultraCompactPointStyleAbsoluteZoomThreshold = 6.5
@@ -221,14 +221,15 @@ class MainActivity : AppCompatActivity() {
             override fun onScale(detector: StandardScaleGestureDetector) {
                 val shouldUseUltraCompactStyle = mapView.mapboxMap.cameraState.zoom < ultraCompactPointStyleAbsoluteZoomThreshold
                 val shouldUseCompactPointStyle = (
-                        !shouldUseUltraCompactStyle &&
-                                mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
-                                (
-                                        mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
-                                                livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
-
-                                        )
+                    !shouldUseUltraCompactStyle &&
+                    (
+                        mapView.mapboxMap.cameraState.zoom < compactPointStyleAbsoluteZoomThreshold ||
+                        (
+                            mapView.mapboxMap.cameraState.zoom < compactPointStyleConditionalZoomThreshold &&
+                            livePositionAnnotationViews.size > compactPointStyleConditionalPointCountThreshold
                         )
+                    )
+                )
 
                 livePositionAnnotationViews.forEach {
                     val cardView: MaterialCardView = it.findViewById(R.id.live_position_marker_card_view)
