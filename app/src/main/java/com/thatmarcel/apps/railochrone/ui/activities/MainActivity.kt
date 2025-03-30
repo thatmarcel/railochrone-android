@@ -47,11 +47,7 @@ import com.mapbox.maps.plugin.annotation.annotations
 import com.mapbox.maps.plugin.annotation.generated.CircleAnnotation
 import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationManager
 import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotation
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationManager
-import com.mapbox.maps.plugin.annotation.generated.PointAnnotationOptions
 import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
-import com.mapbox.maps.plugin.annotation.generated.createPointAnnotationManager
 import com.mapbox.maps.plugin.attribution.attribution
 import com.mapbox.maps.plugin.compass.compass
 import com.mapbox.maps.plugin.gestures.OnScaleListener
@@ -60,6 +56,7 @@ import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.logo.logo
 import com.mapbox.maps.plugin.scalebar.scalebar
 import com.mapbox.maps.plugin.viewport.viewport
+import com.mapbox.maps.viewannotation.ViewAnnotationUpdateMode
 import com.mapbox.maps.viewannotation.geometry
 import com.thatmarcel.apps.railochrone.R
 import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
@@ -151,6 +148,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         circleAnnotationManager = mapView.annotations.createCircleAnnotationManager(AnnotationConfig())
+
+        mapView.viewAnnotationManager.setViewAnnotationUpdateMode(
+            ViewAnnotationUpdateMode.MAP_FIXED_DELAY
+        )
     }
 
     private fun loadMapStyle(isNightModeActive: Boolean) {
@@ -382,7 +383,8 @@ class MainActivity : AppCompatActivity() {
                             livePositionInfos.removeAt(index)
                         }
 
-                    val annotationCirclesToAdd: MutableList<CircleAnnotationOptions> = mutableListOf()
+                    val annotationCircleOptionsToAdd: MutableList<CircleAnnotationOptions> = mutableListOf()
+                    val annotationCirclesToUpdate: MutableList<CircleAnnotation> = mutableListOf()
 
                     for (newLivePositionInfo in newLivePositionInfos) {
                         val prevPositionInfo = livePositionInfos.firstOrNull { it.id == newLivePositionInfo.id }
@@ -391,7 +393,7 @@ class MainActivity : AppCompatActivity() {
                             if (shouldUseNonCompactPointStyle) {
                                 addAnnotationView(newLivePositionInfo)
                             } else {
-                                annotationCirclesToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
+                                annotationCircleOptionsToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
                             }
 
                             livePositionInfos.add(newLivePositionInfo)
@@ -402,7 +404,7 @@ class MainActivity : AppCompatActivity() {
                                 if (shouldUseNonCompactPointStyle) {
                                     addAnnotationView(newLivePositionInfo)
                                 } else {
-                                    annotationCirclesToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
+                                    annotationCircleOptionsToAdd.add(createAnnotationCircleOptions(newLivePositionInfo))
                                 }
                             } else {
                                 if (
@@ -429,7 +431,7 @@ class MainActivity : AppCompatActivity() {
                                             newLivePositionInfo.longitude,
                                             newLivePositionInfo.latitude
                                         )
-                                        circleAnnotationManager.update(annotationCircle)
+                                        annotationCirclesToUpdate.add(annotationCircle)
                                     }
                                 }
                             }
@@ -447,8 +449,10 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     livePositionAnnotationCircles.addAll(
-                        circleAnnotationManager.create(annotationCirclesToAdd)
+                        circleAnnotationManager.create(annotationCircleOptionsToAdd)
                     )
+
+                    circleAnnotationManager.update(annotationCirclesToUpdate)
                 }
             }
         })
