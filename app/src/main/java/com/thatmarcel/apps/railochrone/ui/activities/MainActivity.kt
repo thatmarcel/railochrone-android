@@ -67,7 +67,7 @@ import com.mapbox.maps.viewannotation.ViewAnnotationUpdateMode
 import com.mapbox.maps.viewannotation.geometry
 import com.thatmarcel.apps.railochrone.R
 import com.thatmarcel.apps.railochrone.helpers.AppUpdateChecker
-import com.thatmarcel.apps.railochrone.helpers.types.DistanceCalculator
+import com.thatmarcel.apps.railochrone.helpers.DistanceCalculator
 import com.thatmarcel.apps.railochrone.helpers.types.LivePositionDisplayInfo
 import com.thatmarcel.apps.railochrone.helpers.types.LivePositionInfo
 import okhttp3.Call

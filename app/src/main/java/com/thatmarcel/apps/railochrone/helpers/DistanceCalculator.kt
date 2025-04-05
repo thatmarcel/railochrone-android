@@ -1,4 +1,4 @@
-package com.thatmarcel.apps.railochrone.helpers.types
+package com.thatmarcel.apps.railochrone.helpers
 
 import kotlin.math.atan2
 import kotlin.math.cos
